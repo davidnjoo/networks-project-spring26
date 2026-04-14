@@ -208,16 +208,19 @@ def make_plots(results: dict):
         plt.close()
     """
     os.makedirs(FIGURES_DIR, exist_ok=True)
-    valid  = {c: d for c, d in results.items() if d.get("median_ms") is not None}
-    cities = sorted(valid, key=lambda c: valid[c]["distance_km"])
-
+    cities = sorted(results, key=lambda c: results[c]["distance_km"])
     # ── Figure 1 ──────────────────────────────
     fig, ax = plt.subplots(figsize=(11, 6))
     x = np.arange(len(cities))
     width = 0.4
 
-    measured = [valid[c]["median_ms"] for c in cities]
-    theoretical = [valid[c]["theoretical_min_ms"] for c in cities]
+    measured = [
+        results[c]["median_ms"] if results[c]["median_ms"] is not None else 0
+        for c in cities
+    ]
+
+    theoretical = [results[c]["theoretical_min_ms"] for c in cities]
+
 
     ax.bar(x - width/2, measured, width, label="Measured RTT")
     ax.bar(x + width/2, theoretical, width, label="Theoretical RTT")
@@ -238,22 +241,26 @@ def make_plots(results: dict):
     legend_handles = {}
 
     for city in cities:
-        d = valid[city]
+        d = results[city]
         x = d["distance_km"]
         y = d["median_ms"]
-        continent = d["continent"]
 
+        if y is None:
+            ax.scatter(x, 0, color="red", marker="x")
+            ax.text(x, 0, city, fontsize=8)
+            continue
+
+        continent = d["continent"]
         color = CONTINENT_COLORS.get(continent, "gray")
 
         ax.scatter(x, y, color=color)
-
         ax.text(x, y, city, fontsize=8)
 
         if continent not in legend_handles:
             legend_handles[continent] = mpatches.Patch(color=color, label=continent)
 
     # theoretical line
-    x_vals = np.linspace(0, max(d["distance_km"] for d in valid.values()), 100)
+    x_vals = np.linspace(0, max(d["distance_km"] for d in results.values()), 100)
     y_vals = 2 * (x_vals / FIBER_SPEED_KM_S) * 1000
 
     ax.plot(x_vals, y_vals, linestyle="--", label="Theoretical Min")
